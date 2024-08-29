@@ -9,9 +9,11 @@ const CustomerSchema = new mongoose.Schema({
     preferences: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     lastVisit: { type: Date, default: Date.now },
-    busy: { type: Boolean, default: true },
+    busy: { type: Boolean, required: true },
     history: { type: Array, required: true }
 });
+
+CustomerSchema.index({ isBusy: 1 });
 
 const Customer = mongoose.model('Customer', CustomerSchema);
 
