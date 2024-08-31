@@ -16,29 +16,22 @@ router.post('/serve', async (req, res) => {
         const service = `**The user has served you a ${drink.name}. This drink is ${drink.mixed ? 'well' : 'not'} mixed. It is made of ${drink.ingredients['bubbly-quasar']} parts Bubbly Quasar (an ingredient to make drinks bubbly), ${drink.ingredients['dark-matter-brew']} parts Dark Matter Brew (an ingredient to make drinks bitter), ${drink.ingredients['nebula-nectar']} parts Nebula Nectar (an ingredient to make drinks sweet), and ${drink.ingredients['plasma-peppers']} parts Plasma Peppers (an ingredient to make drinks spicy). ${drink.description} ${(drink.quality != null)? drink.quality : ''}**`;
         customer.history.push({ role: 'user', content: service })
 
-        const prompt = `
-            Please respond with a JSON object that includes:
-            - "message": The response message from you as the customer.
-            - "expression": The facial expression to display (e.g., "smile", "frown").
-            - "tone": The tone of the message (e.g., "happy", "sad", "neutral").
+        customer.history.push({ role: 'system', content: `Remember to respond in strict JSON format following the structure: { "message": "[The response message from you as the customer]", "expression": "[The facial expression to display (must be one of the following: "smily", "angry", "dizzy", "flushed", "sad", "sheepish", "inLove", "laughing", "wink", "crying", "surprised", "excited", "neutral"]", "tone": "[The tone of the message (e.g., "happy", "sad", "neutral", etc. The tone must a simple single word)]"} Do not include anything except the JSON`})
 
-            Respond only with the JSON object.`;
-
-        const content = customer.history;
-        content.push({role: 'system', content: prompt});
-
-        const data = await getChatGptResponse(content);
+        const data = await getChatGptResponse(customer.history);
 
         let response;
         try {
             response = JSON.parse(data);
         } catch (error) {
+            console.log(data);
             throw new Error("Could not parse ChatGPT response.");
         }
 
         let { message, expression, tone } = response;
+        if (!message || !expression || !tone) throw new Error("ChatGPT response missing fields.");
 
-        customer.history.push({ role: 'assistant', content: message });
+        customer.history.push({ role: 'assistant', content: data });
 
         await updateSession(customer, cachedData.visit);
         res.json({ message, expression, tone, customer });
@@ -60,11 +53,25 @@ router.post('/dialog', async (req, res) => {
             customer.history.push({ role: 'user', content: userInput })
         }
 
+        customer.history.push({ role: 'system', content: `Remember to respond in strict JSON format following the structure: { "message": "[The response message from you as the customer]", "expression": "[The facial expression to display (must be one of the following: "smily", "angry", "dizzy", "flushed", "sad", "sheepish", "inLove", "laughing", "wink", "crying", "surprised", "excited", "neutral"]", "tone": "[The tone of the message (e.g., "happy", "sad", "neutral", etc. The tone must a simple single word)]"} Do not include anything except the JSON`})
+
         const data = await getChatGptResponse(customer.history);
 
+        let response;
+        try {
+            response = JSON.parse(data);
+        } catch (error) {
+            console.log(data);
+            throw new Error("Could not parse ChatGPT response.");
+        }
+
+        let { message, expression, tone } = response;
+        if (!message || !expression || !tone) throw new Error("ChatGPT response missing fields.");
+
         customer.history.push({ role: 'assistant', content: data });
+
         await updateSession(customer, cachedData.visit);
-        res.json({ message: data, customer: customer });
+        res.json({ message, expression, tone, customer });
     } catch (error) {
         console.error('Error chatting:', error);
         res.status(500).json({ message: 'Error chatting' });
@@ -78,7 +85,7 @@ router.get('/new-customer', async (req, res) => {
 
         const availablePercentage = availableCustomers / totalCustomers;
 
-        const generateThreshold = 1;  // TODO
+        const generateThreshold = 0.2;  // TODO
 
         let customer;
 
