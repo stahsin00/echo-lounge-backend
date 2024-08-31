@@ -3,6 +3,7 @@ import AWS from 'aws-sdk';
 import sharp from 'sharp';
 import { Blob } from 'buffer';
 import Customer from "../models/Customer.js";
+import redisClient from "./redis.js";
 
 // TODO: checks for if env is not properly set
 // TODO: fetch request timeouts (?)
@@ -114,20 +115,46 @@ export const uploadToS3 = async (imageData) => {
     }
 }
 
+export const visitCustomer = async (customer) => {
+    try {
+        const visitPrompt = `We are in a bar in a futuristic cyberpunk setting. I am a bartender at this bar ready to converse and take drink orders. This world is populated with androids that look entirely human. One such android that has come as a customer. The customer has the following characteristics name : ${customer.name}; personality : ${customer.personality}; appearance : ${customer.appearance}; backstory : ${customer.backstory}; preferences : ${customer.preferences}; conversation style : ${customer.conversationStyle}; overall personal goals are: ${customer.personalGoal}; Come up with the goal for their current visit, current mood, and any recent events that have happened to the customer. Reply only in valid JSON format with the following fields: { \"visitGoal\" : \"[YOUR DESCRIPTION]\", \"mood\" : \"[YOUR DESCRIPTION]\", \"recentEvents\" : \"[YOUR DESCRIPTION]\" } Reply only with the valid JSON object.`;
+        const visitData = await getChatGptResponse([
+            { role: 'system', content: 'You are a helpful assistant.' },
+            { role: 'user', content: visitPrompt }
+        ]);
+
+        console.log(visitData);
+
+        let visitInfo;
+        try {
+            visitInfo = JSON.parse(visitData);  // TODO: confirm if all required fields are present
+            console.log("New visit info generated.");
+        } catch (error) {
+            throw new Error("Could not parse ChatGPT response.");
+        }
+
+        console.log(visitInfo);
+        return visitInfo;
+    } catch (error) {
+        console.error('Error creating visit information:', error);
+        throw error;
+    }
+}
+
 export const generateCustomer = async (busy = true) => {
     try {
         // Generate Customer Info
         const gender = Math.random() < 0.5 ? 'male' : 'female';  // TODO: temp 
 
-        const customerPrompt = `We are in a bar in a futuristic cyberpunk setting. I am a bartender at this bar ready to converse and take orders. This world is populated with androids that look entirely human. They dress up in a variety of ways inspired by the many styles and cultures of the past, present, and future. They can also have any type of personality, thoughts, or preferences. You are one such android that has come as a customer. Your gender is ${gender}. Give a detailed description of you including name, personality, looks, and preferences. Respond strictly in the following JSON format: { \"name\": \"[YOUR NAME]\", \"appearance\": \"[YOUR DESCRIPTION]\", \"personality\": \"[YOUR DESCRIPTION]\", \"preferences\": \"[YOUR DESCRIPTION]\", \"backstory\": \"[YOUR DESCRIPTION]\" } do not include anything else in the response.`;
+        const customerPrompt = `We are in a bar in a futuristic cyberpunk setting. I am a bartender at this bar ready to converse and take orders. This world is populated with androids that look entirely human. They dress up in a variety of ways inspired by the many styles and cultures of the past, present, and future. They can also have any type of personality, thoughts, or preferences. You are one such android that has come as a customer. Your gender is ${gender}. Give a detailed description of you including name, personality, appearance, preferences, backstory, conversation style, and personal goals. Respond strictly in the following JSON format: { \"name\": \"[YOUR NAME]\", \"appearance\": \"[YOUR DESCRIPTION]\", \"personality\": \"[YOUR DESCRIPTION]\", \"preferences\": \"[YOUR DESCRIPTION]\", \"backstory\": \"[YOUR DESCRIPTION]\", \"conversationStyle\": \"[YOUR DESCRIPTION]\", \"personalGoal\": \"[YOUR DESCRIPTION]\" } do not include anything else in the response. This response must be strictly JSON.`;
         const customerData = await getChatGptResponse([
                                             { role: 'system', content: 'You are a helpful assistant.' },
                                             { role: 'user', content: customerPrompt }
                                         ]);
-        console.log(customerData);
+        
         let customerInfo;
         try {
-            customerInfo = JSON.parse(customerData);
+            customerInfo = JSON.parse(customerData);  // TODO: validate presence of all required fields
             console.log("New customer info generated.");
         } catch (error) {
             throw new Error("Could not parse ChatGPT response.");
@@ -147,8 +174,11 @@ export const generateCustomer = async (busy = true) => {
         console.log("Image uploaded.");
 
         // Create Context
-        const historyPrompt = `We are in a bar in a futuristic cyberpunk setting. I am a bartender at this bar ready to converse and take drink orders. This world is populated with androids that look entirely human. You are one such android that has come as a customer. Reply with only what you say (your response will be placed directly in a dialog display) and no other descriptions of the setting or anything else. Your name is: ${customerInfo.name}; Your personality is: ${customerInfo.personality}; Your appearance is: ${customerInfo.appearance}; Your backstory is: ${customerInfo.backstory}; Your preferences are: ${customerInfo.preferences}; Speak in character to the descriptions and respond like you are speaking directly to the bartender. You do not know anything about the bartender so do not comment on anyone but yourself.`;
-        customerInfo.history = [{ role: 'system', content: historyPrompt }];
+        const historyPrompt = `We are in a bar in a futuristic cyberpunk setting. I am a bartender at this bar ready to converse and take drink orders. This world is populated with androids that look entirely human. You are one such android that has come as a customer. Reply with only what you say (your response will be placed directly in a dialog display) and no other descriptions of the setting or anything else. Your name is: ${customerInfo.name}; Your personality is: ${customerInfo.personality}; Your appearance is: ${customerInfo.appearance}; Your backstory is: ${customerInfo.backstory}; Your preferences are: ${customerInfo.preferences}; Your conversation style is: ${customerInfo.conversationStyle}; Speak in character to the descriptions and respond like you are speaking directly to the bartender. You do not know anything about the bartender so do not comment on anyone but yourself.`;
+        customerInfo.history = [
+            { role: 'system', content: historyPrompt },
+            { role: 'system', content: `Yours current personal goals are ${customerInfo.personalGoal}`}
+        ];
 
         customerInfo.imageUrl = imageUrl;
         customerInfo.busy = busy;
@@ -161,4 +191,35 @@ export const generateCustomer = async (busy = true) => {
         console.error('Error generating customer:', error);
         throw error;
     }
+}
+
+export async function startSession(customer, visit) {  // TODO: use something else for session key
+    const sessionKey = `session:${customer._id.toString()}`;
+    const customerData = JSON.stringify({
+        customer,
+        visit,
+        lastUpdated: Date.now()
+    });
+
+    await redisClient.set(sessionKey, customerData);
+
+    console.log(`Session started for character ${customer.name}.`);
+}
+
+export async function getSession(customerId) {
+    const sessionKey = `session:${customerId}`;
+    const customerData = await redisClient.get(sessionKey);
+
+    return customerData ? JSON.parse(customerData) : null;
+}
+
+export async function updateSession(customer, visit) {
+    const sessionKey = `session:${customer._id.toString()}`;
+    const customerData = JSON.stringify({
+        customer,
+        visit,
+        lastUpdated: Date.now()
+    });
+
+    await redisClient.set(sessionKey, customerData);
 }
