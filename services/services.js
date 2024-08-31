@@ -177,7 +177,7 @@ export const generateCustomer = async (busy = true) => {
         const historyPrompt = `We are in a bar in a futuristic cyberpunk setting. I am a bartender at this bar ready to converse and take drink orders. This world is populated with androids that look entirely human. You are one such android that has come as a customer. Reply with only what you say (your response will be placed directly in a dialog display) and no other descriptions of the setting or anything else. Your name is: ${customerInfo.name}; Your personality is: ${customerInfo.personality}; Your appearance is: ${customerInfo.appearance}; Your backstory is: ${customerInfo.backstory}; Your preferences are: ${customerInfo.preferences}; Your conversation style is: ${customerInfo.conversationStyle}; Speak in character to the descriptions and respond like you are speaking directly to the bartender. You do not know anything about the bartender so do not comment on anyone but yourself.`;
         customerInfo.history = [
             { role: 'system', content: historyPrompt },
-            { role: 'system', content: `Yours current personal goals are ${customerInfo.personalGoal}`}
+            { role: 'system', content: `Yours current personal goals are: ${customerInfo.personalGoal}`}
         ];
 
         customerInfo.imageUrl = imageUrl;

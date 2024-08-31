@@ -74,7 +74,7 @@ router.post('/dialog', async (req, res) => {
 router.get('/new-customer', async (req, res) => {
     try {
         const totalCustomers = await Customer.countDocuments();  // TODO: cache
-        const availableCustomers = await Customer.countDocuments({ busy: false });
+        const availableCustomers = await Customer.countDocuments({ busy: false, attention: false });
 
         const availablePercentage = availableCustomers / totalCustomers;
 
@@ -86,7 +86,7 @@ router.get('/new-customer', async (req, res) => {
             customer = await generateCustomer();
         } else {
             customer = await Customer.findOneAndUpdate(
-                { busy: false },
+                { busy: false, attention: false },
                 { busy: true, lastVisit: Date.now() },
                 { sort: { lastVisit: 1 }, new: true }
             );
