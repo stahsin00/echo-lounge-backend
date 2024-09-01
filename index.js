@@ -13,10 +13,9 @@ app.use(cors());
 app.use(express.json());
 
 connectDB();
+await redisClient.connect();
 
 app.use("/api", apiRouter);
-
-await redisClient.connect();
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}.`);
