@@ -19,11 +19,15 @@ router.post('/serve', async (req, res) => {
     const { drink, customer } = req.body;
     if (!drink || !customer || !customer._id) {
         res.status(400).json({ message: "Missing required fields."});
+        return;
     }
 
     try {
         const cachedData = await getSession(customer._id.toString());
-        if (!cachedData) res.status(400).json({ message: "Invalid session."});
+        if (!cachedData)  {
+            res.status(401).json({ message: "Invalid session."});
+            return;
+        }
 
         const service = `**The user has served you a ${drink.name}. This drink is ${drink.mixed ? 'well' : 'not'} mixed. It is made of ${drink.ingredients['bubbly-quasar']} parts Bubbly Quasar (an ingredient to make drinks bubbly), ${drink.ingredients['dark-matter-brew']} parts Dark Matter Brew (an ingredient to make drinks bitter), ${drink.ingredients['nebula-nectar']} parts Nebula Nectar (an ingredient to make drinks sweet), and ${drink.ingredients['plasma-peppers']} parts Plasma Peppers (an ingredient to make drinks spicy). ${drink.description} ${(drink.quality != null)? drink.quality : ''}**`;
         customer.history.push({ role: 'user', content: service })
@@ -48,11 +52,15 @@ router.post('/converse', async (req, res) => {
     const { userInput, customer } = req.body;
     if (!customer || !customer._id) {
         res.status(400).json({ message: "Missing required fields."});
+        return;
     }
 
     try {
         const cachedData = await getSession(customer._id.toString());
-        if (!cachedData) res.status(400).json({ message: "Invalid session."});
+        if (!cachedData)  {
+            res.status(401).json({ message: "Invalid session."});
+            return;
+        }
 
         if (!userInput || userInput.trim() == "") {
             customer.history.push({ role: 'user', content: '**The user has decided to just listen.**' })
