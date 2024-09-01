@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import apiRouter from "./routes/api.js";
 import connectDB from "./db/db.js";
+import redisClient from "./services/redis.js";
+import './services/cron.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 connectDB();
+await redisClient.connect();
 
 app.use("/api", apiRouter);
 
