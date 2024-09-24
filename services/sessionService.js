@@ -1,4 +1,4 @@
-import redisClient from "./redis.js";
+import redisClient, { scanKeys } from "./redis.js";
 import { isRedisConnected, isMongoConnected } from '../utils/connectivityUtils.js';
 import Customer from '../models/Customer.js';
 
@@ -43,7 +43,7 @@ export async function cleanupSessions() {
     }
     
     try {
-        const keys = await redisClient.keys('session:*');
+        const keys = await scanKeys('session:*');
 
         for (const key of keys) {
             const data = await redisClient.get(key);
