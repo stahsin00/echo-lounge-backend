@@ -20,6 +20,7 @@ export const getChatGptResponse = async (messages) => {
         }
 
         const result = await response.json();
+        console.log(result.choices[0].message.content);
         return result.choices[0].message.content;
     } catch (error) {
         console.error('Error getting ChatGPT response:', error);

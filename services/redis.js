@@ -4,9 +4,8 @@ const redisHost = process.env.REDIS_HOST || 'localhost';
 const redisPort = process.env.REDIS_PORT || 6379;
 
 const redisClient = createClient({
-    url: `rediss://${redisHost}:${redisPort}`,
+    url: `redis://${redisHost}:${redisPort}`,
     socket: {
-        tls: true,
         connectTimeout: 5000
     }
 });
@@ -35,10 +34,11 @@ export async function scanKeys(pattern) {
             MATCH: pattern,
             COUNT: 100
         });
+
         cursor = reply.cursor;
         keys.push(...reply.keys);
-    } while (cursor !== '0');
-    
+        
+    } while (cursor != '0');
     return keys;
 }
 

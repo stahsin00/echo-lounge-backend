@@ -34,6 +34,7 @@ export async function updateSession(customer, visit) {  // TODO
 }
 
 export async function cleanupSessions() {
+    console.log("Cleaning up sessions...");
     const redisConnected = await isRedisConnected();
     const mongoConnected = isMongoConnected();
 
@@ -60,6 +61,9 @@ export async function cleanupSessions() {
                     const customerDocument = await Customer.findById(customer._id);
                     if (customerDocument) {
                         customer.history = customerDocument.history;  // TODO: temp
+                        if (customer.memory) {
+                            customer.history.push(...customer.memory);
+                        }
                         customer.busy = false;
                         Object.assign(customerDocument, customer);
                         await customerDocument.save();
